@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="ExpandableTextView">
+        <attr name="tv_expandLines" format="integer" />
+        <attr name="tv_shrinkBitmap" format="reference" />
+        <attr name="tv_expandBitmap" format="reference" />
+        <attr name="tv_textStateColor" format="color" />
+        <attr name="tv_textContentColor" format="color" />
+        <attr name="tv_textContentSize" format="dimension" />
+        <attr name="tv_textShrink" format="string" />
+        <attr name="tv_textExpand" format="string" />
+    </declare-styleable>
+</resources>
