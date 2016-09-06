@@ -313,7 +313,7 @@ public class ExpandableTextView extends LinearLayout implements OnClickListener 
     /**
      * 确定收起折叠状态
      *
-     * @param endIndex
+     * @param endIndex 设定的折叠行数
      */
     @SuppressWarnings("deprecation")
     private void changeExpandState(int endIndex) {
@@ -331,7 +331,7 @@ public class ExpandableTextView extends LinearLayout implements OnClickListener 
     /**
      * 设置折叠状态（如果折叠行数设定大于文本行数，那么折叠/展开图片布局将会隐藏,文本将一直处于展开状态）
      *
-     * @param endIndex
+     * @param endIndex 设定的折叠行数
      */
     @SuppressWarnings("deprecation")
     private void setExpandState(int endIndex) {
