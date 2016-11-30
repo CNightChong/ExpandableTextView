@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <com.chong.expandabletextview.ExpandableTextView
+        android:id="@+id/expand_text_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:collapse_text="收起"
+        app:expand_text="全文"
+        app:max_collapsed_lines="4"
+        app:need_drawable="false"
+        app:need_text="true"
+        app:only_expand="true">
+
+        <TextView
+            android:id="@+id/tv_expandable_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="10dp"
+            android:layout_marginRight="10dp"
+            android:layout_marginTop="8dp"
+            android:paddingBottom="10dp"
+            android:textColor="#666666"
+            android:textSize="16sp"/>
+
+        <TextView
+            android:id="@+id/tv_expand_collapse"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start|bottom"
+            android:layout_marginLeft="10dp"
+            android:layout_marginRight="10dp"
+            android:paddingBottom="10dp"
+            android:textColor="@color/colorPrimary"/>
+    </com.chong.expandabletextview.ExpandableTextView>
+
+</LinearLayout>

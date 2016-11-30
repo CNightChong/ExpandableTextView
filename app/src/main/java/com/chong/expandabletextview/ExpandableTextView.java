@@ -3,427 +3,275 @@ package com.chong.expandabletextview;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.drawable.Drawable;
-import android.os.Handler;
-import android.os.Message;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
 import android.text.TextUtils;
 import android.util.AttributeSet;
-import android.view.LayoutInflater;
+import android.util.SparseBooleanArray;
 import android.view.View;
-import android.view.View.OnClickListener;
-import android.view.ViewTreeObserver;
-import android.view.ViewTreeObserver.OnPreDrawListener;
-import android.widget.ImageView;
+import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
-import android.widget.RelativeLayout;
 import android.widget.TextView;
 
-import java.lang.ref.WeakReference;
-
-
 /**
- * 按行数进行折叠带过渡动画的TextView
+ * 可以展开折叠的带过渡动画的TextView
  */
-public class ExpandableTextView extends LinearLayout implements OnClickListener {
+public class ExpandableTextView extends LinearLayout implements View.OnClickListener {
 
+    private static final String TAG = ExpandableTextView.class.getSimpleName();
     /**
-     * TextView
+     * 默认最大折叠最大行数
      */
-    private TextView textView;
+    private static final int MAX_COLLAPSED_LINES = 8;
+    /**
+     * 内容文本
+     */
+    protected TextView mTvContent;
+    /**
+     * 展开/折叠按钮
+     */
+    protected ImageButton mBtnState;
+    /**
+     * 展开/折叠文本
+     */
+    protected TextView mTvState;
+    /**
+     * 是否需要重新布局
+     */
+    private boolean isRelayout;
+    /**
+     * 默认TextView处于折叠状态
+     */
+    private boolean mCollapsed = true;
+    /**
+     * 折叠最大显示行数
+     */
+    private int mMaxCollapsedLines;
+    /**
+     * 向下展开的图标
+     */
+    private Drawable mExpandDrawable;
+    /**
+     * 向上折叠的图标
+     */
+    private Drawable mCollapseDrawable;
+    /**
+     * 是否展示展开/折叠按钮
+     */
+    private boolean isNeedDrawable = true;
+    /**
+     * 是否展示展开/折叠文本
+     */
+    private boolean isNeedText = false;
+    /**
+     * 向下展开文本
+     */
+    private CharSequence mExpandText;
+    /**
+     * 向上折叠文本
+     */
+    private CharSequence mCollapseText;
+    /**
+     * 在列表中，保存状态
+     */
+    private SparseBooleanArray mCollapsedStatus;
+    /**
+     * 列表中位置
+     */
+    private int mPosition;
+    /**
+     * 只需要展开，不需要折叠
+     */
+    private boolean isOnlyExpand;
 
-    /**
-     * 收起/全部TextView
-     */
-    private TextView tvState;
-
-    /**
-     * 点击进行折叠/展开的图片
-     */
-    private ImageView ivExpandOrShrink;
-
-    /**
-     * 底部是否折叠/收起的父类布局
-     */
-    private RelativeLayout rlToggleLayout;
-
-    /**
-     * 提示折叠的图片资源
-     */
-    private Drawable drawableShrink;
-    /**
-     * 提示显示全部的图片资源
-     */
-    private Drawable drawableExpand;
-
-    /**
-     * 全部/收起文本的字体颜色
-     */
-    private int textViewStateColor;
-    /**
-     * 展开提示文本
-     */
-    private String textExpand;
-    /**
-     * 收缩提示文本
-     */
-    private String textShrink;
-
-    /**
-     * 是否是折叠状态
-     */
-    private boolean isShrink = false;
-
-    /**
-     * 是否需要折叠
-     */
-    private boolean isExpandNeeded = false;
-
-    /**
-     * 是否初始化TextView
-     */
-    private boolean isInitTextView = true;
-
-    /**
-     * 折叠显示的行数
-     */
-    private int expandLines;
-
-    /**
-     * 文本的行数
-     */
-    private int textLines;
-
-    /**
-     * 显示的文本
-     */
-    private CharSequence textContent;
-
-    /**
-     * 显示的文本颜色
-     */
-    private int textContentColor;
-
-    /**
-     * 显示的文本字体大小
-     */
-    private float textContentSize;
-
-    /**
-     * 动画过度间隔
-     */
-    private int sleepTime = 30;
-
-    /**
-     * handler信号
-     */
-    private static final int WHAT = 2;
-    /**
-     * 动画结束信号
-     */
-    private static final int WHAT_ANIMATION_END = 3;
-
-    /**
-     * 动画结束，只是改变图标，并不隐藏
-     */
-    private static final int WHAT_EXPAND_ONLY = 4;
-
-    private MyHandler handler;
+    public ExpandableTextView(Context context) {
+        this(context, null);
+    }
 
     public ExpandableTextView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        initValue(context, attrs);
-        initView(context);
-        initClick();
+        init(attrs);
     }
 
-    private void initValue(Context context, AttributeSet attrs) {
-        TypedArray ta = context.obtainStyledAttributes(attrs,
-                R.styleable.ExpandableTextView);
-
-        expandLines = ta.getInteger(
-                R.styleable.ExpandableTextView_tv_expandLines, 5);
-
-        drawableShrink = ta
-                .getDrawable(R.styleable.ExpandableTextView_tv_shrinkBitmap);
-        drawableExpand = ta
-                .getDrawable(R.styleable.ExpandableTextView_tv_expandBitmap);
-
-        textViewStateColor = ta.getColor(R.styleable.ExpandableTextView_tv_textStateColor,
-                ContextCompat.getColor(context, R.color.colorPrimary));
-
-        textShrink = ta.getString(R.styleable.ExpandableTextView_tv_textShrink);
-        textExpand = ta.getString(R.styleable.ExpandableTextView_tv_textExpand);
-
-        if (null == drawableShrink) {
-            drawableShrink = ContextCompat.getDrawable(context, R.drawable.icon_green_arrow_up);
-        }
-
-        if (null == drawableExpand) {
-            drawableExpand = ContextCompat.getDrawable(context, R.drawable.icon_green_arrow_down);
-        }
-
-        if (TextUtils.isEmpty(textShrink)) {
-            textShrink = context.getString(R.string.shrink);
-        }
-
-        if (TextUtils.isEmpty(textExpand)) {
-            textExpand = context.getString(R.string.expand);
-        }
-
-
-        textContentColor = ta.getColor(R.styleable.ExpandableTextView_tv_textContentColor, ContextCompat.getColor(context, R.color.color_gray_light_content_text));
-        textContentSize = ta.getDimension(R.styleable.ExpandableTextView_tv_textContentSize, 14);
-
-        ta.recycle();
-    }
-
-    private void initView(Context context) {
-
-        LayoutInflater inflater = (LayoutInflater) context
-                .getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-        inflater.inflate(R.layout.layout_expandable_textview, this);
-
-        rlToggleLayout = (RelativeLayout) findViewById(R.id.rl_expandable);
-
-        textView = (TextView) findViewById(R.id.tv_expandable);
-        textView.setTextColor(textContentColor);
-        textView.getPaint().setTextSize(textContentSize);
-
-        ivExpandOrShrink = (ImageView) findViewById(R.id.iv_expandable);
-
-        tvState = (TextView) findViewById(R.id.tv_expandable_hint);
-        tvState.setTextColor(textViewStateColor);
-
-        handler = new MyHandler(this, textView);
-    }
-
-    private void initClick() {
-        textView.setOnClickListener(this);
-        rlToggleLayout.setOnClickListener(this);
-    }
-
-    public void setText(CharSequence charSequence) {
-
-        textContent = charSequence;
-
-        textView.setText(charSequence.toString());
-
-        ViewTreeObserver viewTreeObserver = textView.getViewTreeObserver();
-        viewTreeObserver.addOnPreDrawListener(new OnPreDrawListener() {
-
-            @Override
-            public boolean onPreDraw() {
-                if (!isInitTextView) {
-                    return true;
-                }
-                textLines = textView.getLineCount();
-                isExpandNeeded = textLines > expandLines;
-                isInitTextView = false;
-                if (isExpandNeeded) {
-                    isShrink = true;
-                    textView.setMaxLines(expandLines);
-                    setExpandState(expandLines);
-                } else {
-                    isShrink = false;
-                    doNotExpand();
-                }
-                return true;
-            }
-        });
-
-    }
-
-    private static class MyHandler extends Handler {
-        WeakReference<ExpandableTextView> mViewWeakReference;
-        WeakReference<TextView> mTextViewWeakReference;
-
-        public MyHandler(ExpandableTextView view, TextView textView) {
-            mViewWeakReference = new WeakReference<>(view);
-            mTextViewWeakReference = new WeakReference<>(textView);
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            ExpandableTextView view = mViewWeakReference.get();
-            TextView textView = mTextViewWeakReference.get();
-            if (view != null && textView != null) {
-                if (WHAT == msg.what) {
-                    textView.setMaxLines(msg.arg1);
-                } else if (WHAT_ANIMATION_END == msg.what) {
-                    view.setExpandState(msg.arg1);
-                } else if (WHAT_EXPAND_ONLY == msg.what) {
-                    view.changeExpandState(msg.arg1);
-                }
-            }
-        }
-    }
-
-    /**
-     * @param startIndex 开始动画的起点行数
-     * @param endIndex   结束动画的终点行数
-     * @param what       动画结束后的handler信号标示
-     */
-    private void doAnimation(final int startIndex, final int endIndex, final int what) {
-
-        // 动画线程
-        new Thread(new Runnable() {
-
-            @Override
-            public void run() {
-
-                if (startIndex < endIndex) {
-                    // 如果起止行数小于结束行数，那么往下一行一行展开至结束行数
-                    int count = startIndex;
-                    while (count++ < endIndex) {
-                        Message msg = handler.obtainMessage(WHAT, count, 0);
-
-                        try {
-                            Thread.sleep(sleepTime);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-
-                        handler.sendMessage(msg);
-                    }
-                } else if (startIndex > endIndex) {
-                    // 如果起止行数大于结束行数，那么往上一行一行折叠至结束行数
-                    int count = startIndex;
-                    while (count-- > endIndex) {
-                        Message msg = handler.obtainMessage(WHAT, count, 0);
-                        try {
-                            Thread.sleep(sleepTime);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-
-                        handler.sendMessage(msg);
-                    }
-                }
-
-                // 动画结束后发送结束的信号
-                Message msg = handler.obtainMessage(what, endIndex, 0);
-                handler.sendMessage(msg);
-
-            }
-
-        }).start();
-
-    }
-
-    /**
-     * 确定收起折叠状态
-     *
-     * @param endIndex 设定的折叠行数
-     */
-    @SuppressWarnings("deprecation")
-    private void changeExpandState(int endIndex) {
-        rlToggleLayout.setVisibility(View.VISIBLE);
-        if (endIndex < textLines) {
-            ivExpandOrShrink.setBackgroundDrawable(drawableExpand);
-            tvState.setText(textExpand);
-        } else {
-            ivExpandOrShrink.setBackgroundDrawable(drawableShrink);
-            tvState.setText(textShrink);
-        }
-
-    }
-
-    /**
-     * 设置折叠状态（如果折叠行数设定大于文本行数，那么折叠/展开图片布局将会隐藏,文本将一直处于展开状态）
-     *
-     * @param endIndex 设定的折叠行数
-     */
-    @SuppressWarnings("deprecation")
-    private void setExpandState(int endIndex) {
-
-        if (endIndex < textLines) {
-            isShrink = true;
-            rlToggleLayout.setVisibility(View.VISIBLE);
-            ivExpandOrShrink.setBackgroundDrawable(drawableExpand);
-            textView.setOnClickListener(this);
-            tvState.setText(textExpand);
-        } else {
-            isShrink = false;
-            rlToggleLayout.setVisibility(View.GONE);
-            ivExpandOrShrink.setBackgroundDrawable(drawableShrink);
-            textView.setOnClickListener(null);
-            tvState.setText(textShrink);
-        }
-
-    }
-
-    /**
-     * 无需折叠
-     */
-    private void doNotExpand() {
-        textView.setMaxLines(expandLines);
-        rlToggleLayout.setVisibility(View.GONE);
-        textView.setOnClickListener(null);
+    public ExpandableTextView(Context context, AttributeSet attrs, int defStyle) {
+        super(context, attrs, defStyle);
+        init(attrs);
     }
 
     @Override
-    public void onClick(View v) {
-        if (v.getId() == R.id.rl_expandable || v.getId() == R.id.tv_expandable) {
-            clickImageToggle();
+    public void setOrientation(int orientation) {
+        if (LinearLayout.HORIZONTAL == orientation) {
+            throw new IllegalArgumentException("ExpandableTextView only supports Vertical Orientation.");
+        }
+        super.setOrientation(orientation);
+    }
+
+    @Override
+    public void onClick(View view) {
+        if (isNeedDrawable) {
+            if (mBtnState.getVisibility() != View.VISIBLE) {
+                return;
+            }
+        }
+        if (isNeedText) {
+            if (mTvState.getVisibility() != View.VISIBLE) {
+                return;
+            }
         }
 
+        mCollapsed = !mCollapsed;
+        if (isNeedDrawable) {
+            if (isOnlyExpand && !mCollapsed) {
+                mBtnState.setVisibility(GONE);
+            } else {
+                mBtnState.setVisibility(VISIBLE);
+            }
+            isRelayout = true;
+            mBtnState.setImageDrawable(mCollapsed ? mExpandDrawable : mCollapseDrawable);
+        }
+        if (isNeedText) {
+            if (isOnlyExpand && !mCollapsed) {
+                mTvState.setVisibility(GONE);
+            } else {
+                mTvState.setVisibility(VISIBLE);
+            }
+            isRelayout = true;
+            mTvState.setText(mCollapsed ? mExpandText : mCollapseText);
+        }
+        requestLayout();
+
+        // 按位置保存展开/折叠状态
+        if (mCollapsedStatus != null) {
+            mCollapsedStatus.put(mPosition, mCollapsed);
+        }
     }
 
-    private void clickImageToggle() {
-        if (isShrink) {
-            // 如果是已经折叠，那么进行非折叠处理
-            doAnimation(expandLines, textLines, WHAT_EXPAND_ONLY);
-        } else {
-            // 如果是非折叠，那么进行折叠处理
-            doAnimation(textLines, expandLines, WHAT_EXPAND_ONLY);
+    @Override
+    protected void onFinishInflate() {
+        findViews();
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        // 如果没有改变显示内容，或者显示内容为空，执行super.onMeasure()并返回
+        if (!isRelayout || getVisibility() == View.GONE) {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+            return;
+        }
+        isRelayout = false;
+        // 先隐藏状态按钮，将文字最大显示行数设置到最大，后面再根据测量情况修改
+        if (isNeedDrawable) {
+            mBtnState.setVisibility(View.GONE);
+        }
+        if (isNeedText) {
+            mTvState.setVisibility(View.GONE);
+        }
+        mTvContent.setMaxLines(Integer.MAX_VALUE);
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+
+        // 未超过最大折叠行数
+        if (mTvContent.getLineCount() <= mMaxCollapsedLines) {
+            return;
         }
 
-        // 切换状态
-        isShrink = !isShrink;
+        // 需要折叠
+        if (mCollapsed) {
+            mTvContent.setMaxLines(mMaxCollapsedLines);
+        }
+        if (isNeedDrawable) {
+            if (isOnlyExpand && !mCollapsed) {
+                mBtnState.setVisibility(GONE);
+            } else {
+                mBtnState.setVisibility(VISIBLE);
+            }
+        }
+        if (isNeedText) {
+            if (isOnlyExpand && !mCollapsed) {
+                mTvState.setVisibility(GONE);
+            } else {
+                mTvState.setVisibility(VISIBLE);
+            }
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
     }
 
-    public Drawable getDrawableShrink() {
-        return drawableShrink;
+    public void setText(@Nullable CharSequence text) {
+        isRelayout = true;
+        mTvContent.setText(text);
+        setVisibility(TextUtils.isEmpty(text) ? View.GONE : View.VISIBLE);
     }
 
-    public void setDrawableShrink(Drawable drawableShrink) {
-        this.drawableShrink = drawableShrink;
+    // 在列表中使用时，设置文本
+    public void setText(@Nullable CharSequence text, @NonNull SparseBooleanArray collapsedStatus, int position) {
+        mCollapsedStatus = collapsedStatus;
+        mPosition = position;
+        boolean isCollapsed = collapsedStatus.get(position, true);
+        clearAnimation();
+        mCollapsed = isCollapsed;
+        if (isNeedDrawable) {
+            mBtnState.setImageDrawable(mCollapsed ? mExpandDrawable : mCollapseDrawable);
+        }
+        if (isNeedText) {
+            mTvState.setText(mCollapsed ? mExpandText : mCollapseText);
+        }
+        setText(text);
+        getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
+        requestLayout();
     }
 
-    public Drawable getDrawableExpand() {
-        return drawableExpand;
+    public CharSequence getText() {
+        if (mTvContent == null) {
+            return "";
+        }
+        return mTvContent.getText();
     }
 
-    public void setDrawableExpand(Drawable drawableExpand) {
-        this.drawableExpand = drawableExpand;
+    private void init(AttributeSet attrs) {
+        TypedArray typedArray = getContext().obtainStyledAttributes(attrs, R.styleable.ExpandableTextView);
+        mMaxCollapsedLines = typedArray.getInt(R.styleable.ExpandableTextView_max_collapsed_lines, MAX_COLLAPSED_LINES);
+        mExpandDrawable = typedArray.getDrawable(R.styleable.ExpandableTextView_expand_drawable);
+        mCollapseDrawable = typedArray.getDrawable(R.styleable.ExpandableTextView_collapse_drawable);
+        isNeedDrawable = typedArray.getBoolean(R.styleable.ExpandableTextView_need_drawable, true);
+        isNeedText = typedArray.getBoolean(R.styleable.ExpandableTextView_need_text, false);
+        mExpandText = typedArray.getString(R.styleable.ExpandableTextView_expand_text);
+        mCollapseText = typedArray.getString(R.styleable.ExpandableTextView_collapse_text);
+        isOnlyExpand = typedArray.getBoolean(R.styleable.ExpandableTextView_only_expand, false);
+
+        if (isNeedDrawable) {
+            if (mExpandDrawable == null) {
+                mExpandDrawable = ContextCompat.getDrawable(getContext(), R.drawable.ic_expand_more_black_12dp);
+            }
+            if (mCollapseDrawable == null) {
+                mCollapseDrawable = ContextCompat.getDrawable(getContext(), R.drawable.ic_expand_less_black_12dp);
+            }
+        }
+        if (isNeedText) {
+            if (mExpandText == null) {
+                mExpandText = "展开";
+            }
+            if (mCollapseText == null) {
+                mCollapseText = "收起";
+            }
+        }
+        typedArray.recycle();
+
+        setOrientation(LinearLayout.VERTICAL);
+        setVisibility(GONE);
     }
 
-    public int getExpandLines() {
-        return expandLines;
+    private void findViews() {
+        mTvContent = (TextView) findViewById(R.id.tv_expandable_text);
+        if (isNeedDrawable) {
+            mBtnState = (ImageButton) findViewById(R.id.expand_collapse);
+            mBtnState.setImageDrawable(mCollapsed ? mExpandDrawable : mCollapseDrawable);
+            mBtnState.setOnClickListener(this);
+        }
+        if (isNeedText) {
+            mTvState = (TextView) findViewById(R.id.tv_expand_collapse);
+            mTvState.setText(mCollapsed ? mExpandText : mCollapseText);
+            mTvState.setOnClickListener(this);
+        }
     }
-
-    public void setExpandLines(int newExpandLines) {
-        int start = isShrink ? this.expandLines : textLines;
-        int end = textLines < newExpandLines ? textLines : newExpandLines;
-        doAnimation(start, end, WHAT_ANIMATION_END);
-        this.expandLines = newExpandLines;
-    }
-
-    /**
-     * 取得显示的文本内容
-     *
-     * @return content text
-     */
-    public CharSequence getTextContent() {
-        return textContent;
-    }
-
-    public int getSleepTime() {
-        return sleepTime;
-    }
-
-    public void setSleepTime(int sleepTime) {
-        this.sleepTime = sleepTime;
-    }
-
 }
